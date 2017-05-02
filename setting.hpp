@@ -243,6 +243,8 @@ public:
 			error_exit("lambda should be larger than 0.0");
 		}
 
+		visualization = load_value<bool>("binSceneMaker.visualization");
+
 		camera_1_x = load_value<double>("visibleSceneMaker.camera_1_x");
 		camera_1_y = load_value<double>("visibleSceneMaker.camera_1_y");
 		camera_1_z = load_value<double>("visibleSceneMaker.camera_1_z");

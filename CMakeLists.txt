@@ -11,6 +11,7 @@ if (OPENMP_FOUND)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif()
+find_package(CUDA REQUIRED)
 
 include_directories(${PCL_INCLUDE_DIRS} ${BULLET_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS} "C:/lib/Bullet/install/lib")
@@ -25,5 +26,5 @@ target_link_libraries (binSceneMaker ${PCL_LIBRARIES} ${BULLET_LIBRARIES}
 	optimized BulletSoftBody debug BulletSoftBody_Debug
 	optimized HACD debug HACD_Debug)
 
-add_executable (visibleSceneMaker visibleSceneMaker.cpp setting.hpp)
+cuda_add_executable (visibleSceneMaker visibleSceneMaker.cpp setting.hpp visible_check.cu visible_check.cpp visible_check.h visible_check.cuh)
 target_link_libraries (visibleSceneMaker ${PCL_LIBRARIES})

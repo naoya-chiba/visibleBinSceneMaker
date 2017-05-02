@@ -3,6 +3,7 @@
 #include <thread>
 #include <chrono>
 #include <algorithm>
+#include <chrono>
 
 #include <boost/filesystem.hpp>
 
@@ -12,48 +13,49 @@
 #include <pcl/visualization/pcl_visualizer.h>
 
 #include "setting.hpp"
+#include "visible_check.h"
 
-std::vector<bool> visible_check(
-	const Eigen::Vector3f& cam_pos,
-	const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
-	const double lambda_sqrd)
+using Vec3 = double[3];
+
+// sort pointcloud based on the distance from the camera
+void cloud_sort_by_distance_from_camera(
+	const Vec3& cam_pos,
+	const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud)
 {
-	// sort by distance from the camera
+	const auto sqrd_dist_from_cam = [&](const pcl::PointXYZ& p) {
+		return (cam_pos[0] - p.x) * (cam_pos[0] - p.x) + (cam_pos[1] - p.y) * (cam_pos[1] - p.y) + (cam_pos[2] - p.z) * (cam_pos[2] - p.z);
+	};
+
 	std::sort(cloud->begin(), cloud->end(),
 		[&](const pcl::PointXYZ& lhs, const pcl::PointXYZ& rhs) {
-		return (cam_pos - lhs.getVector3fMap()).squaredNorm() < (cam_pos - rhs.getVector3fMap()).squaredNorm();
+		return sqrd_dist_from_cam(lhs) < sqrd_dist_from_cam(rhs);
 	});
+}
 
-	std::vector<bool> is_visible(cloud->size(), true);
-
-	for (int i = 0; i < cloud->size(); ++i)
+// pcl::PointCloud<pcl::PointXYZ>::Ptr -> std::vector<double>
+std::vector<double> cloud2vector(const pcl::PointCloud<pcl::PointXYZ>::Ptr& c)
+{
+	std::vector<double> v(c->size() * 3);
+	for (int i = 0; i < c->size(); ++i)
 	{
-		if (i % 1024 == 0) std::cout << i << " / " << cloud->size() << std::endl;
-		if (is_visible[i])
-		{
-#pragma omp parallel for
-			for (int j = i + 1; j < cloud->size(); ++j)
-			{
-				if (is_visible[j])
-				{
-					const auto& c = cam_pos;
-					const auto& p = (*cloud)[i].getVector3fMap();
-					const auto& q = (*cloud)[j].getVector3fMap();
-					const auto& v = p - c;
-					const auto& v_sqrd = v.squaredNorm();
-					const auto& k = v.dot(q - c) / v_sqrd;
-					const auto& r_sqrd = (q - c - k * v).squaredNorm();
-					const auto& s_sqrd = k * k * v_sqrd;
-					if (r_sqrd < lambda_sqrd * s_sqrd)
-					{
-						is_visible[j] = false;
-					}
-				}
-			}
-		}
+		v[i * 3 + 0] = (*c)[i].x;
+		v[i * 3 + 1] = (*c)[i].y;
+		v[i * 3 + 2] = (*c)[i].z;
 	}
 
-	return is_visible;
+	return v;
+}
+
+// std::vector<double> -> pcl::PointCloud<pcl::PointXYZ>::Ptr
+pcl::PointCloud<pcl::PointXYZ>::Ptr vector2cloud(const std::vector<double>& v)
+{
+	pcl::PointCloud<pcl::PointXYZ>::Ptr c(new pcl::PointCloud<pcl::PointXYZ>);
+	for (int i = 0; i < v.size() / 3; ++i)
+	{
+		c->push_back(pcl::PointXYZ(v[i * 3 + 0], v[i * 3 + 1], v[i * 3 + 2]));
+	}
+
+	return c;
 }
 
 int main(int argc, char** argv)
@@ -81,28 +83,23 @@ int main(int argc, char** argv)
 	// visiblity check
 	//
 
-	// check form camera1
-	Eigen::Vector3f cam_pos_1(setting.camera_1_x, setting.camera_1_y, setting.camera_1_z);
-	auto is_visible1 = visible_check(cam_pos_1, cloud_load, lambda_sqrd);
+	const auto start = std::chrono::system_clock::now();
 
-	const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_visible1(new pcl::PointCloud<pcl::PointXYZ>);
-	cloud_visible1->reserve(cloud_load->size());
-	for (int i = 0; i < cloud_load->size(); ++i)
-	{
-		if (is_visible1[i]) cloud_visible1->push_back((*cloud_load)[i]);
-	}
+	// check form camera1
+	const Vec3 cam_pos_1{ setting.camera_1_x, setting.camera_1_y, setting.camera_1_z };
+	cloud_sort_by_distance_from_camera(cam_pos_1, cloud_load);
+	auto cloud_visible1_v = visible_check(cam_pos_1, cloud2vector(cloud_load), lambda_sqrd);
+	auto cloud_visible1 = vector2cloud(cloud_visible1_v);
 
 	// check form camera2
-	Eigen::Vector3f cam_pos_2(setting.camera_2_x, setting.camera_2_y, setting.camera_2_z);
-	auto is_visible2 = visible_check(cam_pos_2, cloud_visible1, lambda_sqrd);
+	const Vec3 cam_pos_2{ setting.camera_2_x, setting.camera_2_y, setting.camera_2_z };
+	cloud_sort_by_distance_from_camera(cam_pos_2, cloud_visible1);
+	auto cloud_save_v = visible_check(cam_pos_1, cloud2vector(cloud_visible1), lambda_sqrd);
+	auto cloud_save = vector2cloud(cloud_save_v);
 
-	const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_save(new pcl::PointCloud<pcl::PointXYZ>());
-	cloud_save->reserve(cloud_visible1->size());
-	for (int i = 0; i < cloud_visible1->size(); ++i)
-	{
-		if (is_visible2[i]) cloud_save->push_back((*cloud_visible1)[i]);
-	}
-	
+	const auto end = std::chrono::system_clock::now();
+	std::cout << "time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " [msec]" << std::endl;
+
 	//
 	// save
 	//
@@ -145,6 +142,9 @@ int main(int argc, char** argv)
 			viewer_output->addPointCloud(cloud_save);
 		}
 		
+		viewer_input->spinOnce();
+		viewer_output->spinOnce();
+
 		while (!viewer_input->wasStopped() && !viewer_output->wasStopped())
 		{
 			viewer_input->spinOnce();
