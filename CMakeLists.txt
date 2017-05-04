@@ -26,6 +26,18 @@ if (USE_CUDA)
 	message(STATUS "CUDA Enabled.")
 endif()
 
+option(USE_SIMD "Enable SIMD" TRUE)
+
+if (USE_SIMD)
+	add_definitions(-DUSE_SIMD)
+	message(STATUS "SIMD Enabled.")
+endif()
+
+if (USE_SIMD AND USE_CUDA)
+	message(FATAL_ERROR "You cannot set USE_GPU and USE_SIMD simultaneously.")
+endif()
+
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
 include_directories(${PCL_INCLUDE_DIRS} ${BULLET_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS} "${BULLET_INCLUDE_DIRS}/../lib")
@@ -38,5 +50,9 @@ target_link_libraries(binSceneMaker ${PCL_LIBRARIES} ${BULLET_LIBRARIES}
 	optimized BulletInverseDynamics debug BulletInverseDynamics_Debug
 	optimized HACD debug HACD_Debug)
 
-cuda_add_executable (visibleSceneMaker visibleSceneMaker.cpp setting.hpp visible_check.cu visible_check.cpp visible_check.h visible_check.cuh)
-target_link_libraries (visibleSceneMaker ${PCL_LIBRARIES})
+if (USE_CUDA)
+	cuda_add_executable(visibleSceneMaker visibleSceneMaker.cpp setting.hpp visible_check.cu visible_check.cpp visible_check.h visible_check.cuh)
+ELSE()
+	add_executable(visibleSceneMaker visibleSceneMaker.cpp setting.hpp visible_check.cpp visible_check.h)
+endif()
+target_link_libraries(visibleSceneMaker ${PCL_LIBRARIES})
