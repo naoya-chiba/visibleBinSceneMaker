@@ -1,7 +1,5 @@
 #pragma warning(disable: 4819)
 
-#define GPU
-
 #include <vector>
 #include <iostream>
 
@@ -10,7 +8,7 @@
 
 #include "visible_check.h"
 
-#ifdef GPU
+#ifdef USE_GPU
 #include "visible_check.cuh"
 #endif
 
@@ -21,7 +19,7 @@ std::vector<double> visible_check(
 {
 	std::vector<char> is_visible(cloud.size() / 3, 1);
 
-#ifdef GPU
+#ifdef USE_GPU
 	double* cloud_dev;
 	char* is_visible_dev;
 	CUDA_SAFE_CALL(cudaMalloc((void**)&cloud_dev, sizeof(double) * cloud.size()));
@@ -37,12 +35,14 @@ std::vector<double> visible_check(
 		if (i % 1024 == 0)
 		{
 			std::cout << i << " / " << cloud.size() / 3 << std::endl;
+#ifdef USE_GPU
 			CUDA_SAFE_CALL(cudaMemcpy(is_visible.data(), is_visible_dev, sizeof(char) * is_visible.size(), cudaMemcpyDeviceToHost));
+#endif
 		}
 
 		if (is_visible[i] == 1)
 		{
-#ifdef GPU
+#ifdef USE_GPU
 			call_kernel_func_gpu(cloud_dev, is_visible_dev, lambda_sqrd, i, static_cast<int>(cloud.size() / 3));
 #else
 #pragma omp parallel for
@@ -86,7 +86,7 @@ std::vector<double> visible_check(
 		}
 	}
 
-#ifdef GPU
+#ifdef USE_GPU
 	CUDA_SAFE_CALL(cudaMemcpy(is_visible.data(), is_visible_dev, sizeof(char) * is_visible.size(), cudaMemcpyDeviceToHost));
 	CUDA_SAFE_CALL(cudaFree(cloud_dev));
 	CUDA_SAFE_CALL(cudaFree(is_visible_dev));
