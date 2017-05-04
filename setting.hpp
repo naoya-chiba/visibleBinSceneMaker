@@ -3,6 +3,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <random>
+#include <cstdlib>
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
@@ -13,7 +14,8 @@ std::string setting_file = "./setting.ini";
 void error_exit(const std::string& message)
 {
 	std::cerr << message << std::endl;
-	throw std::runtime_error(message);
+	std::exit(0);
+	//throw std::runtime_error(message);
 }
 
 class SettingBase
