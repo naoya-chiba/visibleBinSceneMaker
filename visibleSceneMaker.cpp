@@ -15,8 +15,6 @@
 #include "setting.hpp"
 #include "visible_check.h"
 
-using Vec3 = double[3];
-
 // sort pointcloud based on the distance from the camera
 void cloud_sort_by_distance_from_camera(
 	const Vec3& cam_pos,
@@ -32,10 +30,10 @@ void cloud_sort_by_distance_from_camera(
 	});
 }
 
-// pcl::PointCloud<pcl::PointXYZ>::Ptr -> std::vector<double>
-std::vector<double> cloud2vector(const pcl::PointCloud<pcl::PointXYZ>::Ptr& c)
+// pcl::PointCloud<pcl::PointXYZ>::Ptr -> std::vector<float>
+std::vector<float> cloud2vector(const pcl::PointCloud<pcl::PointXYZ>::Ptr& c)
 {
-	std::vector<double> v(c->size() * 3);
+	std::vector<float> v(c->size() * 3);
 	for (int i = 0; i < c->size(); ++i)
 	{
 		v[i * 3 + 0] = (*c)[i].x;
@@ -46,8 +44,8 @@ std::vector<double> cloud2vector(const pcl::PointCloud<pcl::PointXYZ>::Ptr& c)
 	return v;
 }
 
-// std::vector<double> -> pcl::PointCloud<pcl::PointXYZ>::Ptr
-pcl::PointCloud<pcl::PointXYZ>::Ptr vector2cloud(const std::vector<double>& v)
+// std::vector<float> -> pcl::PointCloud<pcl::PointXYZ>::Ptr
+pcl::PointCloud<pcl::PointXYZ>::Ptr vector2cloud(const std::vector<float>& v)
 {
 	pcl::PointCloud<pcl::PointXYZ>::Ptr c(new pcl::PointCloud<pcl::PointXYZ>);
 	for (int i = 0; i < v.size() / 3; ++i)
@@ -61,7 +59,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr vector2cloud(const std::vector<double>& v)
 int main(int argc, char** argv)
 {
 	VisibleSceneMakerSetting setting(argc, argv);
-	const double lambda_sqrd = setting.lambda * setting.lambda;
+	const float lambda_sqrd = setting.lambda * setting.lambda;
 
 	//
 	// load
@@ -86,13 +84,21 @@ int main(int argc, char** argv)
 	const auto start = std::chrono::system_clock::now();
 
 	// check form camera1
-	const Vec3 cam_pos_1{ setting.camera_1_x, setting.camera_1_y, setting.camera_1_z };
+	const Vec3 cam_pos_1 {
+		static_cast<float>(setting.camera_1_x),
+		static_cast<float>(setting.camera_1_y),
+		static_cast<float>(setting.camera_1_z)
+	};
 	cloud_sort_by_distance_from_camera(cam_pos_1, cloud_load);
 	auto cloud_visible1_v = visible_check(cam_pos_1, cloud2vector(cloud_load), lambda_sqrd);
 	auto cloud_visible1 = vector2cloud(cloud_visible1_v);
 
 	// check form camera2
-	const Vec3 cam_pos_2{ setting.camera_2_x, setting.camera_2_y, setting.camera_2_z };
+	const Vec3 cam_pos_2 {
+		static_cast<float>(setting.camera_2_x),
+		static_cast<float>(setting.camera_2_y),
+		static_cast<float>(setting.camera_2_z)
+	};
 	cloud_sort_by_distance_from_camera(cam_pos_2, cloud_visible1);
 	auto cloud_save_v = visible_check(cam_pos_1, cloud2vector(cloud_visible1), lambda_sqrd);
 	auto cloud_save = vector2cloud(cloud_save_v);

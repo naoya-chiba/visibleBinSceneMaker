@@ -3,6 +3,6 @@
 
 #include <vector>
 
-using Vec3 = double[3];
+using Vec3 = float[3];
 
-std::vector<double> visible_check(const Vec3& c, const std::vector<double>& cloud, const double lambda_sqrd);
+std::vector<float> visible_check(const Vec3& c, const std::vector<float>& cloud, const float lambda_sqrd);

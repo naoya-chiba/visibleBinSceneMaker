@@ -6,12 +6,12 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 
-using Vec3 = double[3];
+using Vec3 = float[3];
 
-__constant__ double c_dev[3];
+__constant__ float c_dev[3];
 
 __global__
-void kernel_func_gpu(const double* const cloud, char* const is_visible, const double lambda_sqrd, const int i)
+void kernel_func_gpu(const float* const cloud, char* const is_visible, const float lambda_sqrd, const int i)
 {
 	const unsigned int j = blockIdx.x * blockDim.x + threadIdx.x;
 	//const unsigned int j = blockIdx.x * blockDim.x + threadIdx.x + threadIdx.y * 16 + threadIdx.z * 16 * 16;
@@ -19,32 +19,32 @@ void kernel_func_gpu(const double* const cloud, char* const is_visible, const do
 	if (is_visible[i] == 0) return;
 	if (is_visible[j] == 0) return;
 
-	const double* const p = &cloud[3 * i];
-	const double* const q = &cloud[3 * j];
+	const float* const p = &cloud[3 * i];
+	const float* const q = &cloud[3 * j];
 
 	Vec3 v;
 	v[0] = p[0] - c_dev[0];
 	v[1] = p[1] - c_dev[1];
 	v[2] = p[2] - c_dev[2];
 
-	const double v_sqrd = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
+	const float v_sqrd = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
 
 	Vec3 ta;
 	ta[0] = q[0] - c_dev[0];
 	ta[1] = q[1] - c_dev[1];
 	ta[2] = q[2] - c_dev[2];
 
-	const double tb = v[0] * ta[0] + v[1] * ta[1] + v[2] * ta[2];
+	const float tb = v[0] * ta[0] + v[1] * ta[1] + v[2] * ta[2];
 
-	const double k = tb / v_sqrd;
+	const float k = tb / v_sqrd;
 
 	Vec3 tc;
 	tc[0] = ta[0] - k * v[0];
 	tc[1] = ta[1] - k * v[1];
 	tc[2] = ta[2] - k * v[2];
 
-	const double r_sqrd = tc[0] * tc[0] + tc[1] * tc[1] + tc[2] * tc[2];
-	const double s_sqrd = k * k * v_sqrd;
+	const float r_sqrd = tc[0] * tc[0] + tc[1] * tc[1] + tc[2] * tc[2];
+	const float s_sqrd = k * k * v_sqrd;
 
 	if (r_sqrd < lambda_sqrd * s_sqrd)
 	{
@@ -53,7 +53,7 @@ void kernel_func_gpu(const double* const cloud, char* const is_visible, const do
 }
 
 __global__
-void kernel_func_gpu_off(const double* const cloud, char* const is_visible, const double lambda_sqrd, const int i, const int offset)
+void kernel_func_gpu_off(const float* const cloud, char* const is_visible, const float lambda_sqrd, const int i, const int offset)
 {
 	const unsigned int j = blockIdx.x * blockDim.x + threadIdx.x + offset;
 	//const unsigned int j = blockIdx.x * blockDim.x + threadIdx.x + threadIdx.y * 16 + threadIdx.z * 16 * 16;
@@ -61,32 +61,32 @@ void kernel_func_gpu_off(const double* const cloud, char* const is_visible, cons
 	if (is_visible[i] == 0) return;
 	if (is_visible[j] == 0) return;
 
-	const double* const p = &cloud[3 * i];
-	const double* const q = &cloud[3 * j];
+	const float* const p = &cloud[3 * i];
+	const float* const q = &cloud[3 * j];
 
 	Vec3 v;
 	v[0] = p[0] - c_dev[0];
 	v[1] = p[1] - c_dev[1];
 	v[2] = p[2] - c_dev[2];
 
-	const double v_sqrd = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
+	const float v_sqrd = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
 
 	Vec3 ta;
 	ta[0] = q[0] - c_dev[0];
 	ta[1] = q[1] - c_dev[1];
 	ta[2] = q[2] - c_dev[2];
 
-	const double tb = v[0] * ta[0] + v[1] * ta[1] + v[2] * ta[2];
+	const float tb = v[0] * ta[0] + v[1] * ta[1] + v[2] * ta[2];
 
-	const double k = tb / v_sqrd;
+	const float k = tb / v_sqrd;
 
 	Vec3 tc;
 	tc[0] = ta[0] - k * v[0];
 	tc[1] = ta[1] - k * v[1];
 	tc[2] = ta[2] - k * v[2];
 
-	const double r_sqrd = tc[0] * tc[0] + tc[1] * tc[1] + tc[2] * tc[2];
-	const double s_sqrd = k * k * v_sqrd;
+	const float r_sqrd = tc[0] * tc[0] + tc[1] * tc[1] + tc[2] * tc[2];
+	const float s_sqrd = k * k * v_sqrd;
 
 	if (r_sqrd < lambda_sqrd * s_sqrd)
 	{
@@ -95,13 +95,13 @@ void kernel_func_gpu_off(const double* const cloud, char* const is_visible, cons
 }
 
 __host__ void
-set_constant_var(const double* const c)
+set_constant_var(const float* const c)
 {
-	CUDA_SAFE_CALL(cudaMemcpyToSymbol(c_dev, c, sizeof(double) * 3, 0, cudaMemcpyHostToDevice));
+	CUDA_SAFE_CALL(cudaMemcpyToSymbol(c_dev, c, sizeof(float) * 3, 0, cudaMemcpyHostToDevice));
 }
 
 __host__ void
-call_kernel_func_gpu(const double* const cloud_dev, char* const is_visible_dev, const double lambda_sqrd, const int i, const int numel)
+call_kernel_func_gpu(const float* const cloud_dev, char* const is_visible_dev, const float lambda_sqrd, const int i, const int numel)
 {
 	//for (int j = 0; j < numel; ++j)
 	//{

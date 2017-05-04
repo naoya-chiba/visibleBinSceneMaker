@@ -13,5 +13,5 @@ do { \
      } \
 } while(0)
 
-void set_constant_var(const double* const c);
-void call_kernel_func_gpu(const double* const cloud_dev, char* const is_visible_dev, const double lambda_sqrd, const int i, const int numel);
+void set_constant_var(const float* const c);
+void call_kernel_func_gpu(const float* const cloud_dev, char* const is_visible_dev, const float lambda_sqrd, const int i, const int numel);
