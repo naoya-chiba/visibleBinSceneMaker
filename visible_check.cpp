@@ -23,14 +23,13 @@ std::vector<double> visible_check(
 
 #ifdef GPU
 	double* cloud_dev;
-	double* c_dev;
 	char* is_visible_dev;
 	CUDA_SAFE_CALL(cudaMalloc((void**)&cloud_dev, sizeof(double) * cloud.size()));
-	CUDA_SAFE_CALL(cudaMalloc((void**)&c_dev, sizeof(double) * 3));
 	CUDA_SAFE_CALL(cudaMalloc((void**)&is_visible_dev, sizeof(char) * is_visible.size()));
 	CUDA_SAFE_CALL(cudaMemcpy(cloud_dev, cloud.data(), sizeof(double) * cloud.size(), cudaMemcpyHostToDevice));
-	CUDA_SAFE_CALL(cudaMemcpy(c_dev, c, sizeof(double) * 3, cudaMemcpyHostToDevice));
 	CUDA_SAFE_CALL(cudaMemcpy(is_visible_dev, is_visible.data(), sizeof(char) * is_visible.size(), cudaMemcpyHostToDevice));
+	set_constant_var(c);
+
 #endif
 
 	for (int i = 0; i < cloud.size() / 3; ++i)
@@ -38,13 +37,13 @@ std::vector<double> visible_check(
 		if (i % 1024 == 0)
 		{
 			std::cout << i << " / " << cloud.size() / 3 << std::endl;
+			CUDA_SAFE_CALL(cudaMemcpy(is_visible.data(), is_visible_dev, sizeof(char) * is_visible.size(), cudaMemcpyDeviceToHost));
 		}
 
 		if (is_visible[i] == 1)
 		{
 #ifdef GPU
-			call_kernel_func_gpu(cloud_dev, is_visible_dev, c_dev, lambda_sqrd, i, cloud.size() / 3);
-			CUDA_SAFE_CALL(cudaMemcpy(is_visible.data(), is_visible_dev, sizeof(char) * is_visible.size(), cudaMemcpyDeviceToHost));
+			call_kernel_func_gpu(cloud_dev, is_visible_dev, lambda_sqrd, i, static_cast<int>(cloud.size() / 3));
 #else
 #pragma omp parallel for
 			for (int j = i + 1; j < cloud.size() / 3; ++j)
@@ -89,6 +88,9 @@ std::vector<double> visible_check(
 
 #ifdef GPU
 	CUDA_SAFE_CALL(cudaMemcpy(is_visible.data(), is_visible_dev, sizeof(char) * is_visible.size(), cudaMemcpyDeviceToHost));
+	CUDA_SAFE_CALL(cudaFree(cloud_dev));
+	CUDA_SAFE_CALL(cudaFree(is_visible_dev));
+
 #endif
 
 	std::vector<double> cloud_return;
