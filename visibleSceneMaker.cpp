@@ -67,12 +67,23 @@ int main(int argc, char** argv)
 
 	const pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_load(new pcl::PointCloud<pcl::PointXYZ>);
 
-	if (pcl::io::loadPCDFile(setting.load_path, *cloud_load) == -1)
+	if (boost::filesystem::path(setting.load_path).extension() == ".pcd")
+	{
+		if (pcl::io::loadPCDFile(setting.load_path, *cloud_load) == -1)
+		{
+			error_exit("Load error.");
+		}
+	}
+	else if (boost::filesystem::path(setting.load_path).extension() == ".ply")
 	{
 		if (pcl::io::loadPLYFile(setting.load_path, *cloud_load) == -1)
 		{
-			error_exit("PLY or PCD file are only available to load.");
+			error_exit("Load error.");
 		}
+	}
+	else
+	{
+		error_exit("PLY or PCD file are only available to load.");
 	}
 
 	std::cout << "Input cloud: " << cloud_load->size() << std::endl;

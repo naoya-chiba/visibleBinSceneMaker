@@ -40,18 +40,23 @@ int main(int argc, char* argv[])
 	//
 
 	// model load
-	if (pcl::io::loadPCDFile(setting.load_model_path, *model_load) == -1)
+	if (boost::filesystem::path(setting.load_model_path).extension() == ".pcd")
+	{
+		if (pcl::io::loadPCDFile(setting.load_model_path, *model_load) == -1)
+		{
+			error_exit("Model load error.");
+		}
+	}
+	else if (boost::filesystem::path(setting.load_model_path).extension() == ".ply")
 	{
 		if (pcl::io::loadPLYFile(setting.load_model_path, *model_load) == -1)
 		{
-			error_exit("PLY or PCD file are only available to load.");
+			error_exit("Model load error.");
 		}
 	}
-	std::cout << "source cloud size = " << model_load->size() << std::endl;
-
-	if (model_load->size() == 0)
+	else
 	{
-		error_exit("Invalid input.");
+		error_exit("PLY or PCD file are only available to load.");
 	}
 
 	// centering
@@ -465,8 +470,6 @@ int main(int argc, char* argv[])
 				++cnt_save;
 			}
 		}
-
-		std::this_thread::sleep_for(std::chrono::milliseconds(1));
 	}
 
 	std::cout << "Simulation is finished." << std::endl;

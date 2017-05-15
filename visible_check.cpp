@@ -1,4 +1,5 @@
 #pragma warning(disable: 4819)
+#define _CRT_SECURE_NO_WARNINGS
 
 #include <vector>
 #include <iostream>
@@ -16,6 +17,8 @@
 #ifdef USE_GPU
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
+#include <thrust/host_vector.h>
+#include <thrust/device_vector.h>
 #include "visible_check.cuh"
 #endif
 
@@ -48,12 +51,12 @@ std::vector<float> visible_check(
 #endif
 
 #ifdef USE_GPU
-	float* cloud_dev;
-	char* is_visible_dev;
-	CUDA_SAFE_CALL(cudaMalloc((void**)&cloud_dev, sizeof(float) * cloud.size()));
-	CUDA_SAFE_CALL(cudaMalloc((void**)&is_visible_dev, sizeof(char) * numel));
-	CUDA_SAFE_CALL(cudaMemcpy(cloud_dev, cloud.data(), sizeof(float) * cloud.size(), cudaMemcpyHostToDevice));
-	CUDA_SAFE_CALL(cudaMemcpy(is_visible_dev, is_visible.data(), sizeof(char) * numel, cudaMemcpyHostToDevice));
+	thrust::device_vector<float> cloud_dev_vec = cloud;
+	thrust::device_vector<char> is_visible_dev_vec = is_visible;
+
+	char* is_visible_pinned = nullptr;
+	CUDA_SAFE_CALL(cudaMallocHost(&is_visible_pinned, sizeof(char) * numel, cudaHostAllocDefault));
+
 	set_constant_var(c);
 #endif
 
@@ -63,11 +66,14 @@ std::vector<float> visible_check(
 		{
 			std::cout << i << " / " << numel << std::endl;
 #ifdef USE_GPU
-			CUDA_SAFE_CALL(cudaMemcpy(is_visible.data(), is_visible_dev, sizeof(char) * numel, cudaMemcpyDeviceToHost));
+			CUDA_SAFE_CALL(cudaMemcpy(is_visible_pinned, thrust::raw_pointer_cast(is_visible_dev_vec.data()), sizeof(char) * numel, cudaMemcpyDeviceToHost));
 #endif
 		}
 
-#ifdef USE_SIMD
+#if defined(USE_GPU)
+		if (is_visible_pinned[i] == 0) continue;
+		call_kernel_func_gpu(thrust::raw_pointer_cast(cloud_dev_vec.data()), thrust::raw_pointer_cast(is_visible_dev_vec.data()), lambda_sqrd, i, numel);
+#elif defined(USE_SIMD)
 		if (is_visible_aligned[i] == 0) continue;
 #pragma omp parallel for
 		for (int j = i + 1; j < numel; ++j)
@@ -120,9 +126,6 @@ std::vector<float> visible_check(
 		}
 #else
 		if (is_visible[i] == 0) continue;
-#ifdef USE_GPU
-		call_kernel_func_gpu(cloud_dev, is_visible_dev, lambda_sqrd, i, numel);
-#else
 #pragma omp parallel for
 		for (int j = i + 1; j < numel; ++j)
 		{
@@ -161,13 +164,11 @@ std::vector<float> visible_check(
 			}
 		}
 #endif
-#endif
 	}
 
 #ifdef USE_GPU
-	CUDA_SAFE_CALL(cudaMemcpy(is_visible.data(), is_visible_dev, sizeof(char) * numel, cudaMemcpyDeviceToHost));
-	CUDA_SAFE_CALL(cudaFree(cloud_dev));
-	CUDA_SAFE_CALL(cudaFree(is_visible_dev));
+	CUDA_SAFE_CALL(cudaMemcpy(is_visible.data(), thrust::raw_pointer_cast(is_visible_dev_vec.data()), sizeof(char) * numel, cudaMemcpyDeviceToHost));
+	cudaFreeHost(is_visible_pinned);
 #endif
 
 #ifdef USE_SIMD
